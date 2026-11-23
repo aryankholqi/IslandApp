@@ -1,0 +1,514 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:a="clr-namespace:IslandApp.Activities"
+                    xmlns:c="clr-namespace:IslandApp.Controls">
+
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="Theme.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <!-- Shared by the island and bubble templates (BubbleTemplates.xaml). -->
+    <!-- One icon per device in use, in priority order, so the first is always the most important (the closed bubble shows only it). -->
+    <DataTemplate x:Key="CaptureIcons">
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Style="{StaticResource IconText}" Text="&#xE7F4;" Foreground="{StaticResource SnowBrush}" Margin="0,0,7,0"
+                       Visibility="{Binding IsScreen, Converter={StaticResource VisibleWhenTrue}}" AutomationProperties.Name="Screen sharing" />
+            <TextBlock Style="{StaticResource IconText}" Text="&#xE714;" Foreground="{StaticResource PunkBrush}" Margin="0,0,7,0"
+                       Visibility="{Binding IsCamera, Converter={StaticResource VisibleWhenTrue}}" AutomationProperties.Name="Camera" />
+            <TextBlock Style="{StaticResource IconText}" Text="&#xE720;" Foreground="{DynamicResource AccentBrush}" Margin="0,0,7,0"
+                       Visibility="{Binding IsMicrophone, Converter={StaticResource VisibleWhenTrue}}" AutomationProperties.Name="Microphone" />
+        </StackPanel>
+    </DataTemplate>
+
+    <Style x:Key="BatteryRing" TargetType="c:RingGauge">
+        <Setter Property="Brush" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="TrackBrush" Value="{StaticResource TrackBrush}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsCharging}" Value="True">
+                <Setter Property="Brush" Value="{StaticResource PunkBrush}" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Implicit templates: the island's ContentPresenter picks one by activity type. -->
+
+    <!-- Media -->
+    <DataTemplate DataType="{x:Type a:MediaActivity}">
+        <Grid>
+            <!-- Compact -->
+            <DockPanel Margin="10,0,14,0" LastChildFill="False"
+                       Visibility="{Binding IsExpanded, Converter={StaticResource CollapsedWhenTrue}}">
+                <Grid DockPanel.Dock="Left" Width="24" Height="24" VerticalAlignment="Center">
+                    <Border CornerRadius="7" Background="{DynamicResource ArtworkFallbackBrush}" Style="{StaticResource ArtworkFallback}" />
+                    <Border CornerRadius="7">
+                        <Border.Background>
+                            <ImageBrush ImageSource="{Binding Artwork}" Stretch="UniformToFill" />
+                        </Border.Background>
+                    </Border>
+                </Grid>
+                <c:Waveform DockPanel.Dock="Right" Width="20" Height="16" VerticalAlignment="Center"
+                            BarCount="4" Brush="{Binding AccentBrush}" IsActive="{Binding IsPlaying}" />
+            </DockPanel>
+
+            <!-- Expanded -->
+            <Grid Margin="20,18,20,12"
+                  Visibility="{Binding IsExpanded, Converter={StaticResource VisibleWhenTrue}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <DockPanel>
+                    <Grid DockPanel.Dock="Left" Width="56" Height="56">
+                        <Border CornerRadius="14" Background="{DynamicResource ArtworkFallbackBrush}" Style="{StaticResource ArtworkFallback}" />
+                        <Border CornerRadius="14">
+                            <Border.Background>
+                                <ImageBrush ImageSource="{Binding Artwork}" Stretch="UniformToFill" />
+                            </Border.Background>
+                        </Border>
+                    </Grid>
+                    <c:Waveform DockPanel.Dock="Right" Width="26" Height="24" VerticalAlignment="Center"
+                                BarCount="5" Brush="{Binding AccentBrush}" IsActive="{Binding IsPlaying}" />
+                    <StackPanel Margin="14,0" VerticalAlignment="Center">
+                        <TextBlock c:Emoji.Text="{Binding Title}" Style="{StaticResource TitleText}" />
+                        <TextBlock c:Emoji.Text="{Binding Artist}" Style="{StaticResource CaptionText}" FontSize="13" Margin="0,3,0,0" />
+                    </StackPanel>
+                </DockPanel>
+
+                <Grid Grid.Row="1" Margin="0,14,0,0"
+                      Visibility="{Binding HasTimeline, Converter={StaticResource VisibleWhenTrue}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding PositionText}" FontSize="11" Foreground="{StaticResource MutedBrush}" Style="{StaticResource NumericText}" />
+                    <c:SeekBar Grid.Column="1" Height="14" Margin="10,0" VerticalAlignment="Center"
+                               Progress="{Binding Progress, Mode=OneWay}"
+                               Fill="{Binding AccentBrush}"
+                               Track="{StaticResource TrackBrush}"
+                               Command="{Binding SeekCommand}" IsEnabled="{Binding CanSeek}" />
+                    <TextBlock Grid.Column="2" Text="{Binding RemainingText}" FontSize="11" Foreground="{StaticResource MutedBrush}" Style="{StaticResource NumericText}" />
+                </Grid>
+
+                <!-- Shuffle and repeat flank the transport when the player accepts them; lit while on. -->
+                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Button Margin="0,0,14,0" Content="&#xE8B1;" FontSize="16" Width="34" Height="34"
+                            VerticalAlignment="Center" ToolTip="Shuffle"
+                            AutomationProperties.Name="Shuffle" Command="{Binding ToggleShuffleCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GlyphButton}">
+                                <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                                <Style.Triggers>
+                                    <!-- Hidden, not Collapsed: keeps its slot so play/pause stays centred. -->
+                                    <DataTrigger Binding="{Binding CanShuffle}" Value="False">
+                                        <Setter Property="Visibility" Value="Hidden" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsShuffleOn}" Value="True">
+                                        <Setter Property="Foreground" Value="{Binding AccentBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Style="{StaticResource GlyphButton}" Content="{Binding PreviousGlyph}" Command="{Binding SkipPreviousCommand}" />
+                    <Button Style="{StaticResource GlyphButton}" Width="52" Height="44" FontSize="28" Margin="22,0" Command="{Binding PlayPauseCommand}">
+                        <TextBlock>
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="&#xE768;" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                            <Setter Property="Text" Value="&#xE769;" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Button>
+                    <Button Style="{StaticResource GlyphButton}" Content="{Binding NextGlyph}" Command="{Binding SkipNextCommand}" />
+                    <Button Margin="14,0,0,0" Content="{Binding RepeatGlyph}" FontSize="16" Width="34" Height="34"
+                            VerticalAlignment="Center" ToolTip="Repeat"
+                            AutomationProperties.Name="Repeat" Command="{Binding CycleRepeatCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GlyphButton}">
+                                <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CanRepeat}" Value="False">
+                                        <Setter Property="Visibility" Value="Hidden" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsRepeatOn}" Value="True">
+                                        <Setter Property="Foreground" Value="{Binding AccentBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+
+                <!-- The player app's own volume (not the Windows master volume), like Apple Music: quiet and loud ends, in
+                     white so it doesn't read as a second seek bar. -->
+                <DockPanel Grid.Row="3" Margin="0,8,0,0"
+                           Visibility="{Binding HasVolume, Converter={StaticResource VisibleWhenTrue}}">
+                    <TextBlock DockPanel.Dock="Left" Text="&#xE992;" Style="{StaticResource IconText}" FontSize="12"
+                               Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
+                    <TextBlock DockPanel.Dock="Right" Text="&#xE995;" Style="{StaticResource IconText}" FontSize="12"
+                               Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" />
+                    <c:SeekBar Height="14" Margin="10,0" VerticalAlignment="Center"
+                               AutomationProperties.Name="Player volume"
+                               Progress="{Binding VolumeLevel, Mode=OneWay}"
+                               Fill="{StaticResource SnowBrush}"
+                               Track="{StaticResource TrackBrush}"
+                               Command="{Binding SetVolumeCommand}" />
+                </DockPanel>
+
+                <!-- Browser media: play the video itself in the island. -->
+                <Button Grid.Row="2" Style="{StaticResource GlyphButton}" Content="&#xE714;" FontSize="16" Width="34" Height="34"
+                        HorizontalAlignment="Right" VerticalAlignment="Center" ToolTip="Watch in the island"
+                        AutomationProperties.Name="Watch video in the island" Command="{Binding WatchInIslandCommand}"
+                        Visibility="{Binding CanWatchInIsland, Converter={StaticResource VisibleWhenTrue}}" />
+            </Grid>
+        </Grid>
+    </DataTemplate>
+
+    <!-- Timer -->
+    <DataTemplate DataType="{x:Type a:TimerActivity}">
+        <Grid>
+            <DockPanel Margin="14,0" LastChildFill="False"
+                       Visibility="{Binding IsExpanded, Converter={StaticResource CollapsedWhenTrue}}">
+                <TextBlock DockPanel.Dock="Left" Text="&#xE916;" Style="{StaticResource IconText}" Foreground="{DynamicResource AccentBrush}" />
+                <TextBlock DockPanel.Dock="Right" Text="{Binding RemainingText}" Style="{StaticResource NumericText}" Margin="0,-2,0,0"
+                           FontSize="15" FontWeight="Medium" Foreground="{DynamicResource AccentBrush}" />
+            </DockPanel>
+
+            <DockPanel Margin="20,0,22,0"
+                       Visibility="{Binding IsExpanded, Converter={StaticResource VisibleWhenTrue}}">
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource CircleButton}" Width="52" Height="52"
+                            Background="{DynamicResource AccentSoftBrush}" Foreground="{DynamicResource AccentBrush}"
+                            Command="{Binding ToggleCommand}">
+                        <TextBlock>
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="&#xE768;" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                            <Setter Property="Text" Value="&#xE769;" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Button>
+                    <Button Style="{StaticResource CircleButton}" Width="52" Height="52" Margin="10,0,0,0"
+                            Content="&#xE711;" Command="{Binding CancelCommand}" />
+                </StackPanel>
+                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock Text="Timer" Style="{StaticResource CaptionText}" HorizontalAlignment="Right" />
+                    <TextBlock Text="{Binding RemainingText}" Style="{StaticResource NumericText}"
+                               FontSize="40" FontWeight="Light" Foreground="{DynamicResource AccentBrush}" />
+                </StackPanel>
+            </DockPanel>
+        </Grid>
+    </DataTemplate>
+
+    <!-- Volume (transient) -->
+    <DataTemplate DataType="{x:Type a:VolumeActivity}">
+        <DockPanel Margin="18,0">
+            <TextBlock DockPanel.Dock="Left" Foreground="{StaticResource SnowBrush}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource IconText}">
+                        <Setter Property="Text" Value="&#xE767;" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsMuted}" Value="True">
+                                <Setter Property="Text" Value="&#xE74F;" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock DockPanel.Dock="Right" Width="28" TextAlignment="Right" FontSize="13" Margin="0,-2,0,0"
+                       Text="{Binding Percent}" Style="{StaticResource NumericText}" />
+            <Grid Height="6" Margin="12,0" VerticalAlignment="Center">
+                <Border Background="{StaticResource TrackBrush}" CornerRadius="3" />
+                <Border Background="{StaticResource SnowBrush}" CornerRadius="3" RenderTransformOrigin="0,0.5">
+                    <Border.RenderTransform>
+                        <ScaleTransform ScaleX="{Binding Level, Mode=OneWay}" />
+                    </Border.RenderTransform>
+                </Border>
+            </Grid>
+        </DockPanel>
+    </DataTemplate>
+
+    <!-- Claude usage (transient): weekly limit. -->
+    <DataTemplate DataType="{x:Type a:ClaudeActivity}">
+        <DockPanel Margin="18,0">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,-2,0,0">
+                <TextBlock Text="Claude" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+                <TextBlock Text="week" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="6,1,0,0" />
+            </StackPanel>
+            <TextBlock DockPanel.Dock="Right" Width="36" TextAlignment="Right" FontSize="13" Margin="0,-2,0,0"
+                       Text="{Binding WeeklyText}" Style="{StaticResource NumericText}" />
+            <Grid VerticalAlignment="Center">
+                <Grid Height="6" Margin="12,0"
+                      Visibility="{Binding HasData, Converter={StaticResource VisibleWhenTrue}}">
+                    <Border Background="{StaticResource TrackBrush}" CornerRadius="3" />
+                    <Border Background="{StaticResource SnowBrush}" CornerRadius="3" RenderTransformOrigin="0,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform ScaleX="{Binding WeeklyFraction, Mode=OneWay}" />
+                        </Border.RenderTransform>
+                    </Border>
+                </Grid>
+                <TextBlock Text="Connect in Island Settings" FontSize="12" Foreground="{StaticResource MutedBrush}"
+                           Margin="12,-2,12,0" TextTrimming="CharacterEllipsis"
+                           Visibility="{Binding HasData, Converter={StaticResource CollapsedWhenTrue}}" />
+            </Grid>
+        </DockPanel>
+    </DataTemplate>
+
+    <!-- Claude rings (persistent while an IDE is focused): weekly orange, 5-hour white. -->
+    <DataTemplate DataType="{x:Type a:ClaudeRingsActivity}">
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <c:RingGauge Width="20" Height="20" Thickness="3" Value="{Binding Usage.WeeklyFraction, Mode=OneWay}"
+                         Brush="{DynamicResource AccentBrush}" TrackBrush="{StaticResource TrackBrush}" />
+            <TextBlock Text="{Binding Usage.WeeklyText}" FontSize="13" Margin="7,-2,0,0" Style="{StaticResource NumericText}" />
+            <TextBlock Text="week" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="4,-1,0,0" VerticalAlignment="Center" />
+            <c:RingGauge Width="20" Height="20" Thickness="3" Margin="16,0,0,0" Value="{Binding Usage.FiveHourFraction, Mode=OneWay}"
+                         Brush="{StaticResource SnowBrush}" TrackBrush="{StaticResource TrackBrush}" />
+            <TextBlock Text="{Binding Usage.FiveHourText}" FontSize="13" Margin="7,-2,0,0" Style="{StaticResource NumericText}" />
+            <TextBlock Text="{Binding Usage.FiveHourLeftText}" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="4,-1,0,0" VerticalAlignment="Center" />
+        </StackPanel>
+    </DataTemplate>
+
+    <!-- Video: the video window covers the whole island; title and close are drawn inside it (VideoWindow's page). -->
+    <DataTemplate DataType="{x:Type a:VideoActivity}">
+        <Border Background="Black" CornerRadius="30" />
+    </DataTemplate>
+
+    <!-- Screen / camera / microphone in use (persistent): device, app, and how long. -->
+    <DataTemplate DataType="{x:Type a:CaptureActivity}">
+        <DockPanel Margin="14,0,16,0">
+            <ContentPresenter DockPanel.Dock="Left" Content="{Binding}" ContentTemplate="{StaticResource CaptureIcons}" Margin="0,0,-7,0" />
+            <TextBlock DockPanel.Dock="Right" Text="{Binding DurationText}" FontSize="14" FontWeight="Medium" Style="{StaticResource NumericText}" Margin="0,-2,0,0" />
+            <TextBlock Text="{Binding AppName}" FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="10,-2,10,0"
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+    </DataTemplate>
+
+    <!-- Status flash (input language, Caps Lock, VPN / internet): icon in the tone's colour, title, detail. -->
+    <DataTemplate DataType="{x:Type a:StatusActivity}">
+        <DockPanel Margin="16,0">
+            <TextBlock DockPanel.Dock="Left" Text="{Binding Glyph}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource IconText}">
+                        <Setter Property="Foreground" Value="{StaticResource SnowBrush}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding StatusTone}" Value="Accent">
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding StatusTone}" Value="Positive">
+                                <Setter Property="Foreground" Value="{StaticResource PunkBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock DockPanel.Dock="Left" Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Margin="10,-2,0,0" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding Detail}" FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="12,-2,0,0"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+    </DataTemplate>
+
+    <!-- File shelf: compact, the first file's icon and a count; expanded, every file to drag back out (IslandWindow). -->
+    <DataTemplate DataType="{x:Type a:ShelfActivity}">
+        <Grid>
+            <DockPanel Margin="12,0,16,0" Visibility="{Binding IsExpanded, Converter={StaticResource CollapsedWhenTrue}}">
+                <Image DockPanel.Dock="Left" Source="{Binding FirstIcon}" Width="22" Height="22" />
+                <TextBlock DockPanel.Dock="Right" Text="Drag out" FontSize="12" Foreground="{StaticResource MutedBrush}"
+                           Margin="10,-2,0,0" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding CountText}" FontSize="13" FontWeight="SemiBold" Margin="10,-2,0,0"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+
+            <DockPanel Margin="20,14,20,12" Visibility="{Binding IsExpanded, Converter={StaticResource VisibleWhenTrue}}">
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource CircleButton}" Width="26" Height="26" FontSize="11"
+                            Content="&#xE74D;" Command="{Binding ClearCommand}" ToolTip="Clear shelf" AutomationProperties.Name="Clear shelf" />
+                    <TextBlock Text="Shelf · drag a file out, click to open" Style="{StaticResource CaptionText}" VerticalAlignment="Center" />
+                </DockPanel>
+                <!-- shortcut: about five files fit; more scroll with Shift+wheel only. A visible scrollbar if it gets used a lot. -->
+                <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding Files}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid x:Name="Item" Width="72" Margin="0,0,4,0" Background="Transparent" ToolTip="{Binding Path}">
+                                    <StackPanel>
+                                        <Image Source="{Binding Icon}" Width="36" Height="36" />
+                                        <TextBlock Text="{Binding Name}" FontSize="11" Margin="0,4,0,0" TextAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <Button Style="{StaticResource CircleButton}" Width="18" Height="18" FontSize="8"
+                                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,6,0"
+                                            Content="&#xE711;" AutomationProperties.Name="Remove from shelf"
+                                            Command="{Binding DataContext.RemoveFileCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}"
+                                            Visibility="{Binding IsMouseOver, ElementName=Item, Converter={StaticResource VisibleWhenTrue}}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Grid>
+    </DataTemplate>
+
+    <!-- Files dragged over the island: just a gently bobbing arrow and a quiet label; the accent glow does the rest. -->
+    <DataTemplate DataType="{x:Type a:DropHintActivity}">
+        <Grid>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="&#xE896;" Style="{StaticResource IconText}" FontSize="14" Foreground="{DynamicResource AccentBrush}">
+                    <TextBlock.RenderTransform>
+                        <TranslateTransform />
+                    </TextBlock.RenderTransform>
+                    <TextBlock.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="RenderTransform.Y" From="-1.5" To="1.5"
+                                                     Duration="0:0:0.6" AutoReverse="True" RepeatBehavior="Forever">
+                                        <DoubleAnimation.EasingFunction>
+                                            <SineEase EasingMode="EaseInOut" />
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </TextBlock.Triggers>
+                </TextBlock>
+                <TextBlock Text="Drop here" FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="8,-2,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+    </DataTemplate>
+
+    <!-- Battery (persistent while charging or low). -->
+    <DataTemplate DataType="{x:Type a:BatteryActivity}">
+        <DockPanel Margin="12,0,16,0">
+            <c:RingGauge DockPanel.Dock="Left" Width="20" Height="20" Thickness="3" Value="{Binding Fraction, Mode=OneWay}"
+                         Style="{StaticResource BatteryRing}" />
+            <TextBlock DockPanel.Dock="Right" Text="{Binding PercentText}" FontSize="14" FontWeight="Medium" Style="{StaticResource NumericText}" Margin="0,-2,0,0" />
+            <TextBlock Text="{Binding StatusText}" FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="10,-2,10,0" VerticalAlignment="Center" />
+        </DockPanel>
+    </DataTemplate>
+
+
+    <!-- Microphone / camera started (transient). -->
+    <DataTemplate DataType="{x:Type a:PrivacyActivity}">
+        <DockPanel Margin="16,0">
+            <DockPanel.Style>
+                <Style TargetType="DockPanel">
+                    <Setter Property="Tag" Value="{DynamicResource AccentBrush}" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsCamera}" Value="True">
+                            <Setter Property="Tag" Value="{StaticResource PunkBrush}" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DockPanel.Style>
+            <TextBlock DockPanel.Dock="Left" Foreground="{Binding Tag, RelativeSource={RelativeSource AncestorType=DockPanel}}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock" BasedOn="{StaticResource IconText}">
+                        <Setter Property="Text" Value="&#xE720;" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCamera}" Value="True">
+                                <Setter Property="Text" Value="&#xE714;" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock DockPanel.Dock="Left" Text="{Binding KindText}" FontSize="13" FontWeight="SemiBold" Margin="10,-2,0,0"
+                       VerticalAlignment="Center" Foreground="{Binding Tag, RelativeSource={RelativeSource AncestorType=DockPanel}}" />
+            <TextBlock Text="{Binding AppName}" FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="12,-2,0,0"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+    </DataTemplate>
+
+    <!-- Charging (transient) -->
+    <DataTemplate DataType="{x:Type a:ChargingActivity}">
+        <DockPanel Margin="16,0,14,0" LastChildFill="False">
+            <DockPanel.Style>
+                <Style TargetType="DockPanel">
+                    <Setter Property="TextElement.Foreground" Value="{StaticResource SnowBrush}" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsCharging}" Value="True">
+                            <Setter Property="TextElement.Foreground" Value="{StaticResource PunkBrush}" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DockPanel.Style>
+            <TextBlock DockPanel.Dock="Left" Text="{Binding StatusText}" FontSize="13" Margin="0,-2,0,0"
+                       Foreground="{StaticResource SnowBrush}" VerticalAlignment="Center" />
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource NumericText}" FontSize="13" FontWeight="Medium" Margin="0,-2,6,0">
+                    <Run Text="{Binding Percent, Mode=OneWay}" /><Run Text="%" />
+                </TextBlock>
+                <TextBlock Style="{StaticResource IconText}" FontSize="20" Text="&#xEBB5;" />
+            </StackPanel>
+        </DockPanel>
+    </DataTemplate>
+
+    <!-- Telegram / Windows notification (transient) -->
+    <DataTemplate DataType="{x:Type a:MessageActivity}">
+        <DockPanel Margin="10,0,18,0">
+            <Grid DockPanel.Dock="Left" Width="22" Height="22" VerticalAlignment="Center" Margin="0,0,10,0">
+                <!-- Telegram logo; Windows supplies no icon for its (unpackaged) notifications. -->
+                <Viewbox Visibility="{Binding IsTelegram, Converter={StaticResource VisibleWhenTrue}}">
+                    <Canvas Width="24" Height="24">
+                        <Ellipse Width="24" Height="24" Fill="#2AABEE" />
+                        <Path Fill="White" Data="M5.4,11.7 L16.9,7.3 C17.4,7.1 17.9,7.4 17.7,8.2 L15.8,17.2 C15.7,17.8 15.3,18 14.8,17.7 L11.9,15.6 L10.5,16.9 C10.3,17.1 10.2,17.2 9.9,17.2 L10.1,14.2 L15.6,9.2 C15.8,9 15.6,8.9 15.3,9.1 L8.5,13.4 L5.6,12.5 C5,12.3 5,11.9 5.4,11.7 Z" />
+                    </Canvas>
+                </Viewbox>
+                <!-- Windows notifications: the sender's logo, or a bell glyph underneath when it has none. -->
+                <Grid Visibility="{Binding IsTelegram, Converter={StaticResource CollapsedWhenTrue}}">
+                    <TextBlock FontSize="16" Text="&#xEA8F;" Foreground="#0078D4"
+                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource IconText}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding AppLogo}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Image Source="{Binding AppLogo}" RenderOptions.BitmapScalingMode="HighQuality" />
+                </Grid>
+            </Grid>
+            <TextBlock DockPanel.Dock="Left" c:Emoji.Text="{Binding Sender}" FontSize="13" FontWeight="SemiBold"
+                       MaxWidth="130" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,-2,12,0" />
+            <TextBlock c:Emoji.Text="{Binding Text}" FontSize="13" Foreground="{StaticResource MutedBrush}"
+                       HorizontalAlignment="Right" Margin="0,-2,0,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="FlowDirection" Value="LeftToRight" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsRightToLeft}" Value="True">
+                                <Setter Property="FlowDirection" Value="RightToLeft" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </DockPanel>
+    </DataTemplate>
+
+</ResourceDictionary>
